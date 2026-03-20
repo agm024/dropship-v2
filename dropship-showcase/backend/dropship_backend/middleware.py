@@ -34,9 +34,12 @@ class SecurityHeadersMiddleware:
 
         # Avoid API/auth payload caching by browsers/proxies.
         if request.path.startswith("/api/"):
-            response.setdefault("Cache-Control", "no-store, no-cache, must-revalidate, private")
-            response.setdefault("Pragma", "no-cache")
-            response.setdefault("Expires", "0")
+            if request.method == "GET" and request.path.startswith("/api/products"):
+                response.setdefault("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+            else:
+                response.setdefault("Cache-Control", "no-store, no-cache, must-revalidate, private")
+                response.setdefault("Pragma", "no-cache")
+                response.setdefault("Expires", "0")
 
         if settings.SECURE_HSTS_SECONDS:
             hsts = f"max-age={settings.SECURE_HSTS_SECONDS}"

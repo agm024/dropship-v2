@@ -7,21 +7,26 @@ class Product(models.Model):
     description = models.TextField(blank=True, default="")
     short_description = models.CharField(max_length=500, blank=True, default="")
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    category = models.CharField(max_length=100, blank=True, default="")
-    brand = models.CharField(max_length=100, blank=True, default="")
-    product_code = models.CharField(max_length=100, blank=True, default="")
+    category = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    brand = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    product_code = models.CharField(max_length=100, blank=True, default="", db_index=True)
     image_url = models.URLField(max_length=1000, blank=True, default="")
     gallery_urls = models.JSONField(default=list, blank=True)
     features = models.JSONField(default=list, blank=True)
     stock = models.PositiveIntegerField(default=0)
     rating = models.DecimalField(max_digits=3, decimal_places=1, default=0)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "products"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["is_active", "created_at"]),
+            models.Index(fields=["is_active", "category"]),
+            models.Index(fields=["is_active", "brand"]),
+        ]
 
     def save(self, *args, **kwargs):
         # Reuse the smallest missing positive ID when creating a new product.

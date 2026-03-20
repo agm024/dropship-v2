@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Search, SlidersHorizontal, X, LayoutGrid, List, Star, ShoppingCart, Truck } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import Filters from "../components/Filters";
+import ProductGridSkeleton from "../components/ProductGridSkeleton";
 import { formatINR } from "../utils/currency";
 import { useCart } from "../context/CartContext";
 import { getDiscount, getMRP } from "../utils/product";
@@ -258,9 +259,7 @@ export default function ProductListing() {
 
       {/* Results */}
       {loading ? (
-        <div className="text-center py-20">
-          <p className="text-lg font-semibold mb-2">Loading products...</p>
-        </div>
+        <ProductGridSkeleton count={8} />
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-lg font-semibold mb-2">No products found</p>

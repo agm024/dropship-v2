@@ -2,6 +2,10 @@ const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api" : "htt
 
 let productsCache = null;
 let productsPromise = null;
+let productByIdCache = new Map();
+let productByIdPromises = new Map();
+
+const PRODUCT_DETAIL_CACHE_TTL_MS = 5 * 60 * 1000;
 
 function toString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -59,16 +63,40 @@ export async function fetchProducts({ useCache = true } = {}) {
 }
 
 export async function fetchProductById(id) {
-  const res = await fetch(`${API}/products/${id}/`);
-  if (!res.ok) {
-    if (res.status === 404) return null;
-    throw new Error("Failed to load product details");
+  const key = String(id);
+  const cached = productByIdCache.get(key);
+  if (cached && Date.now() - cached.cachedAt < PRODUCT_DETAIL_CACHE_TTL_MS) {
+    return cached.value;
   }
-  const data = await res.json();
-  return normalizeProduct(data?.product);
+
+  if (productByIdPromises.has(key)) {
+    return productByIdPromises.get(key);
+  }
+
+  const request = fetch(`${API}/products/${id}/`)
+    .then((res) => {
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error("Failed to load product details");
+      }
+      return res.json();
+    })
+    .then((data) => {
+      const normalized = normalizeProduct(data?.product);
+      productByIdCache.set(key, { value: normalized, cachedAt: Date.now() });
+      return normalized;
+    })
+    .finally(() => {
+      productByIdPromises.delete(key);
+    });
+
+  productByIdPromises.set(key, request);
+  return request;
 }
 
 export function clearProductsCache() {
   productsCache = null;
   productsPromise = null;
+  productByIdCache = new Map();
+  productByIdPromises = new Map();
 }

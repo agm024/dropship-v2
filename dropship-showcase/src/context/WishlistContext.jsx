@@ -80,20 +80,22 @@ export function WishlistProvider({ children }) {
       const productId = product?.id;
       if (productId == null) return;
       const normalizedId = String(productId);
-      const inWishlist = wishlistIds.has(normalizedId);
+      let nextAction = "added";
 
       // Optimistic update
       setWishlistIds((prev) => {
         const next = new Set(prev);
-        if (inWishlist) {
+        if (next.has(normalizedId)) {
           next.delete(normalizedId);
+          nextAction = "removed";
         } else {
           next.add(normalizedId);
+          nextAction = "added";
         }
         return next;
       });
 
-      toast.success(inWishlist ? "Removed from wishlist" : "Added to wishlist");
+      toast.success(nextAction === "removed" ? "Removed from wishlist" : "Added to wishlist");
 
       // Sync to backend if authenticated
       if (user && token) {
@@ -111,7 +113,7 @@ export function WishlistProvider({ children }) {
         }
       }
     },
-    [wishlistIds, user, token]
+    [user, token]
   );
 
   const isInWishlist = useCallback((id) => wishlistIds.has(String(id)), [wishlistIds]);

@@ -38,6 +38,11 @@ class Order(models.Model):
     class Meta:
         db_table = "orders"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.order_number:
@@ -61,6 +66,10 @@ class OrderItem(models.Model):
 
     class Meta:
         db_table = "order_items"
+        indexes = [
+            models.Index(fields=["order"]),
+            models.Index(fields=["product_id"]),
+        ]
 
     def __str__(self):
         return f"{self.product_name} x{self.quantity}"

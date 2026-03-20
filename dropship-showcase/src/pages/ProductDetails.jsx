@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { useWishlist } from "../context/WishlistContext";
 import { useCart } from "../context/CartContext";
+import ProductDetailsSkeleton from "../components/ProductDetailsSkeleton";
 import { formatINR } from "../utils/currency";
 import { useProduct } from "../hooks/useProducts";
 
@@ -105,10 +106,10 @@ export default function ProductDetails() {
 
   if (loading) {
     return (
-      <section className="container-pad py-12">
+      <>
         <Helmet><title>Loading Product | G.O.L.D</title></Helmet>
-        <p className="text-slate-500 dark:text-slate-400">Loading product...</p>
-      </section>
+        <ProductDetailsSkeleton />
+      </>
     );
   }
 
@@ -182,6 +183,8 @@ export default function ProductDetails() {
             <img
               src={activeImage || fallbackImage}
               alt={product.name}
+              loading="eager"
+              decoding="async"
               className="max-h-full max-w-full object-contain"
             />
           </motion.div>
@@ -200,6 +203,8 @@ export default function ProductDetails() {
                 <img
                   src={img}
                   alt={`${product.name} ${idx + 1}`}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-contain bg-slate-100 dark:bg-slate-800"
                 />
               </button>

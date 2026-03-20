@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -5,6 +6,7 @@ import { Mail, Phone, UserCircle2, ShieldCheck, Truck, RefreshCcw, Headphones, S
 import ProductCard from "../components/ProductCard";
 import Carousel from "../components/Carousel";
 import AdSlider from "../components/AdSlider";
+import ProductGridSkeleton from "../components/ProductGridSkeleton";
 import { useProducts } from "../hooks/useProducts";
 
 const TRUST_BADGES = [
@@ -20,11 +22,14 @@ const TESTIMONIALS = [
 ];
 
 export default function Home() {
-  const { products } = useProducts();
-  const featured = products.slice(0, 8);
-  const trending = products.slice(0, 10);
-  const topRated = [...products].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0)).slice(0, 4);
-  const categories = [...new Set(products.map((p) => p.category))];
+  const { products, loading } = useProducts();
+  const featured = useMemo(() => products.slice(0, 8), [products]);
+  const trending = useMemo(() => products.slice(0, 10), [products]);
+  const topRated = useMemo(
+    () => [...products].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0)).slice(0, 4),
+    [products]
+  );
+  const categories = useMemo(() => [...new Set(products.map((p) => p.category))], [products]);
   const navigate = useNavigate();
 
   const contacts = [
@@ -95,17 +100,25 @@ export default function Home() {
             View all <ChevronRight size={14} />
           </Link>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {featured.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        {loading ? (
+          <ProductGridSkeleton count={8} />
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {featured.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Trending Carousel */}
       <section className="container-pad py-8">
         <h2 className="text-2xl font-bold mb-4">Trending Now 🔥</h2>
-        <Carousel products={trending} />
+        {loading ? (
+          <ProductGridSkeleton count={4} />
+        ) : (
+          <Carousel products={trending} />
+        )}
       </section>
 
       {/* Top Rated */}
@@ -116,11 +129,15 @@ export default function Home() {
             See more <ChevronRight size={14} />
           </Link>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {topRated.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        {loading ? (
+          <ProductGridSkeleton count={4} />
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {topRated.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Deals */}

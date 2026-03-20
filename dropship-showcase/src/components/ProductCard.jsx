@@ -68,6 +68,7 @@ export default function ProductCard({ product }) {
           src={imageUrl}
           alt={product.name}
           loading="lazy"
+          decoding="async"
           className="h-52 w-full object-cover group-hover:scale-105 transition duration-300"
         />
       </Link>

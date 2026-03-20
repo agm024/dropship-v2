@@ -2,36 +2,68 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from django.core.cache import cache
 
 from .models import Product
-from .serializers import ProductSerializer
+from .serializers import ProductSerializer, ProductListSerializer
+
+
+PRODUCT_LIST_CACHE_TTL = 120
+PRODUCT_DETAIL_CACHE_TTL = 180
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def product_list(request):
-    products = Product.objects.filter(is_active=True)
+    category = (request.query_params.get("category") or "").strip().lower()
+    brand = (request.query_params.get("brand") or "").strip().lower()
+    search = (request.query_params.get("q") or "").strip().lower()
 
-    category = request.query_params.get("category")
+    cache_key = f"products:list:{category}:{brand}:{search}"
+    cached_payload = cache.get(cache_key)
+    if cached_payload is not None:
+        return Response(cached_payload)
+
+    products = Product.objects.filter(is_active=True).only(
+        "id",
+        "name",
+        "short_description",
+        "price",
+        "category",
+        "brand",
+        "image_url",
+        "gallery_urls",
+        "stock",
+        "rating",
+    )
+
     if category:
         products = products.filter(category__icontains=category)
 
-    brand = request.query_params.get("brand")
     if brand:
         products = products.filter(brand__icontains=brand)
 
-    search = request.query_params.get("q")
     if search:
         products = products.filter(name__icontains=search)
 
-    return Response({"products": ProductSerializer(products, many=True).data})
+    payload = {"products": ProductListSerializer(products, many=True).data}
+    cache.set(cache_key, payload, PRODUCT_LIST_CACHE_TTL)
+    return Response(payload)
 
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def product_detail(request, pk):
+    cache_key = f"products:detail:{pk}"
+    cached_payload = cache.get(cache_key)
+    if cached_payload is not None:
+        return Response(cached_payload)
+
     try:
         product = Product.objects.get(pk=pk, is_active=True)
     except Product.DoesNotExist:
         return Response({"error": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
-    return Response({"product": ProductSerializer(product).data})
+
+    payload = {"product": ProductSerializer(product).data}
+    cache.set(cache_key, payload, PRODUCT_DETAIL_CACHE_TTL)
+    return Response(payload)

@@ -141,37 +141,22 @@ export function CartProvider({ children }) {
     const loadServerCart = async () => {
       try {
         const guestItems = safeParseCart(safeStorageGet(GUEST_LS_KEY));
-        if (guestItems.length) {
-          let mergedAll = true;
-          for (const item of guestItems) {
-            const postRes = await fetch(`${API}/cart/`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                productId: item.productId,
-                quantity: item.quantity,
-              }),
-            });
-            if (!postRes.ok) {
-              mergedAll = false;
-            }
-          }
-
-          if (mergedAll) {
-            safeStorageRemove(GUEST_LS_KEY);
-          }
-        }
-
-        const getRes = await fetch(`${API}/cart/`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const syncRes = await fetch(`${API}/cart/sync/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ items: guestItems }),
         });
-        if (!getRes.ok || cancelled) return;
+        if (!syncRes.ok || cancelled) return;
 
-        const getData = await getRes.json();
-        const finalItems = normalizeServerItems(getData);
+        const syncData = await syncRes.json();
+        const finalItems = normalizeServerItems(syncData);
+
+        if (guestItems.length) {
+          safeStorageRemove(GUEST_LS_KEY);
+        }
 
         if (!cancelled) {
           setItems((prev) =>

@@ -15,6 +15,10 @@ class WishlistItem(models.Model):
         db_table = "wishlist_items"
         unique_together = [("user", "product_id")]
         ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["product_id"]),
+        ]
 
     def __str__(self):
         return f"WishlistItem(user={self.user_id}, product={self.product_id})"

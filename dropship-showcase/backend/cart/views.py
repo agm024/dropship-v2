@@ -8,9 +8,35 @@ from .serializers import (
     CART_MAX_QUANTITY,
     CartItemSerializer,
     AddToCartSerializer,
+    SyncCartSerializer,
     UpdateQuantitySerializer,
 )
 from products.models import Product
+
+
+def _products_map_for_cart_items(items):
+    product_ids = [item.product_id for item in items]
+    if not product_ids:
+        return {}
+
+    products = Product.objects.filter(id__in=product_ids, is_active=True).only(
+        "id",
+        "name",
+        "short_description",
+        "price",
+        "category",
+        "brand",
+        "image_url",
+        "gallery_urls",
+        "stock",
+        "rating",
+    )
+    return {product.id: product for product in products}
+
+
+def _serialize_cart_items(items):
+    products_map = _products_map_for_cart_items(items)
+    return CartItemSerializer(items, many=True, context={"products_map": products_map}).data
 
 
 @api_view(["GET", "POST", "DELETE"])
@@ -20,7 +46,7 @@ def cart_list(request):
 
     if request.method == "GET":
         items = CartItem.objects.filter(user=user)
-        return Response({"items": CartItemSerializer(items, many=True).data})
+        return Response({"items": _serialize_cart_items(items)})
 
     if request.method == "POST":
         serializer = AddToCartSerializer(data=request.data)
@@ -64,7 +90,10 @@ def cart_list(request):
             item.quantity = new_quantity
             item.save(update_fields=["quantity"])
 
-        return Response({"item": CartItemSerializer(item).data}, status=status.HTTP_200_OK)
+        return Response(
+            {"item": CartItemSerializer(item, context={"products_map": {product.id: product}}).data},
+            status=status.HTTP_200_OK,
+        )
 
     if request.method == "DELETE":
         CartItem.objects.filter(user=user).delete()
@@ -112,8 +141,66 @@ def cart_item(request, product_id):
 
         item.quantity = quantity
         item.save(update_fields=["quantity"])
-        return Response({"item": CartItemSerializer(item).data})
+        return Response(
+            {"item": CartItemSerializer(item, context={"products_map": {product.id: product}}).data}
+        )
 
     if request.method == "DELETE":
         CartItem.objects.filter(user=user, product_id=product_id).delete()
         return Response({"success": True})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def cart_sync(request):
+    serializer = SyncCartSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response({"errors": serializer.errors}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    user = request.user
+    incoming_items = serializer.validated_data.get("items") or []
+
+    if incoming_items:
+        requested_ids = {item["productId"] for item in incoming_items}
+        products = Product.objects.filter(id__in=requested_ids, is_active=True).only("id", "stock")
+        products_map = {product.id: product for product in products}
+
+        existing_items = CartItem.objects.filter(user=user, product_id__in=requested_ids)
+        existing_map = {item.product_id: item for item in existing_items}
+
+        to_create = []
+        to_update = []
+
+        for incoming in incoming_items:
+            product_id = incoming["productId"]
+            requested_quantity = incoming["quantity"]
+
+            product = products_map.get(product_id)
+            if not product:
+                continue
+
+            max_allowed = min(CART_MAX_QUANTITY, int(product.stock or 0))
+            if max_allowed < 1:
+                continue
+
+            bounded_quantity = min(requested_quantity, max_allowed)
+            existing = existing_map.get(product_id)
+
+            if existing:
+                new_quantity = min(max_allowed, existing.quantity + bounded_quantity)
+                if new_quantity != existing.quantity:
+                    existing.quantity = new_quantity
+                    to_update.append(existing)
+            else:
+                to_create.append(
+                    CartItem(user=user, product_id=product_id, quantity=bounded_quantity)
+                )
+
+        if to_create:
+            CartItem.objects.bulk_create(to_create, ignore_conflicts=True)
+
+        if to_update:
+            CartItem.objects.bulk_update(to_update, ["quantity"])
+
+    final_items = list(CartItem.objects.filter(user=user))
+    return Response({"items": _serialize_cart_items(final_items)})
